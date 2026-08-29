@@ -1,0 +1,9 @@
+services:
+  scrypted-mcp:
+    build: .
+    container_name: scrypted-mcp
+    restart: unless-stopped
+    ports:
+      - "3300:3000"
+    env_file:
+      - .env
