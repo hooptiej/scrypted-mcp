@@ -122,6 +122,75 @@ function createServer(): McpServer {
   );
 
   server.tool(
+    "get_recording_active",
+    "Check whether a camera is actively recording to the NVR. Reflects the VideoRecorder.recordingActive " +
+      "state and the NVR's per-camera \"Disable Scrypted NVR\" privacy-mode setting.",
+    { idOrName: z.string().describe("Camera device id or exact device name") },
+    async ({ idOrName }) => {
+      const client = await getScryptedClient();
+      const device =
+        client.systemManager.getDeviceById(idOrName) ??
+        client.systemManager.getDeviceByName(idOrName);
+      if (!device) {
+        return { content: [{ type: "text", text: `No device found for "${idOrName}"` }], isError: true };
+      }
+      const recordingActive = await (device as any).recordingActive;
+      let privacyModeDisabled: boolean | undefined;
+      if (typeof (device as any).getSettings === "function") {
+        const settings = await (device as any).getSettings();
+        privacyModeDisabled = settings.find((s: any) => s.key === "recording:privacyMode")?.value;
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ idOrName, recordingActive, privacyModeDisabled }, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "set_recording_active",
+    "Turn NVR recording on or off for a camera. Calls VideoRecorderManagement.setRecordingActive() and " +
+      "flips the NVR's per-camera \"Disable Scrypted NVR\" privacy-mode setting to match, since both must " +
+      "agree for recording to actually start or stop.",
+    {
+      idOrName: z.string().describe("Camera device id or exact device name"),
+      active: z.boolean().describe("true to enable recording, false to disable it"),
+    },
+    async ({ idOrName, active }) => {
+      const client = await getScryptedClient();
+      const device =
+        client.systemManager.getDeviceById(idOrName) ??
+        client.systemManager.getDeviceByName(idOrName);
+      if (!device) {
+        return { content: [{ type: "text", text: `No device found for "${idOrName}"` }], isError: true };
+      }
+      if (typeof (device as any).setRecordingActive !== "function") {
+        return {
+          content: [{ type: "text", text: `Device "${idOrName}" does not support VideoRecorderManagement` }],
+          isError: true,
+        };
+      }
+      await (device as any).setRecordingActive(active);
+      if (typeof (device as any).putSetting === "function") {
+        await (device as any).putSetting("recording:privacyMode", !active);
+      }
+      const recordingActive = await (device as any).recordingActive;
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ idOrName, requestedActive: active, recordingActive }, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
     "invoke_device_method",
     "Escape hatch: call an arbitrary method on a device by name, with JSON-encoded arguments. " +
       "Use this for plugin-specific capabilities not covered by a dedicated tool (e.g. NVR recording " +

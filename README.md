@@ -15,7 +15,18 @@ server — cloud or self-hosted — not just a Docker deployment.
 | `camera_snapshot` | Take a still snapshot from a camera |
 | `set_onoff` | Turn a switch/plug/light on or off |
 | `set_lock` | Lock or unlock a device |
-| `invoke_device_method` | Escape hatch to call any method on any device (e.g. plugin-specific NVR recording mode/schedule settings not covered by a dedicated tool) |
+| `get_recording_active` | Check whether a camera is actively recording to the NVR |
+| `set_recording_active` | Turn NVR recording on/off for a camera |
+| `invoke_device_method` | Escape hatch to call any method on any device |
+
+`get_recording_active`/`set_recording_active` wrap the documented `VideoRecorderManagement`
+interface (`setRecordingActive`) plus the NVR's per-camera `recording:privacyMode` setting —
+these two must agree for recording to actually start or stop. They only cover on/off; the
+richer "Always / Motion-Triggered / Off" mode and day/time schedule grid in the NVR web
+console isn't backed by any device-level RPC method or Settings key (confirmed by grepping
+the NVR plugin's compiled backend for `record`/`schedule`/`rule`/`mode` identifiers — none
+exist there), so it's likely driven by the console's own HTTP endpoint rather than the
+Scrypted SDK. Not wrapped here; use `invoke_device_method` if you reverse-engineer it.
 
 ## Configuration
 
