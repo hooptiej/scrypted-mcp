@@ -1,0 +1,29 @@
+{
+  "name": "scrypted-mcp",
+  "version": "0.1.0",
+  "description": "MCP server exposing a Scrypted NVR/home-automation server's devices, cameras, and controls as tools",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "scrypted-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@scrypted/client": "^1.3.26",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
