@@ -74,6 +74,55 @@ function createServer(): McpServer {
   );
 
   server.tool(
+    "record_clip",
+    "Capture a short live video clip from a camera right now and return it as video/mp4. This pulls " +
+      "directly from the camera's live stream, not from NVR-stored recordings, so it works even when " +
+      "NVR recording is disabled/unlicensed.",
+    {
+      idOrName: z.string().describe("Camera device id or exact device name"),
+      timeoutSeconds: z.number().optional().describe("How long to wait for the clip before giving up (default 20)"),
+    },
+    async ({ idOrName, timeoutSeconds }) => {
+      const client = await getScryptedClient();
+      const device =
+        client.systemManager.getDeviceById(idOrName) ??
+        client.systemManager.getDeviceByName(idOrName);
+      if (!device) {
+        return { content: [{ type: "text", text: `No device found for "${idOrName}"` }], isError: true };
+      }
+      if (typeof (device as any).getVideoStream !== "function") {
+        return {
+          content: [{ type: "text", text: `Device "${idOrName}" does not support VideoCamera.getVideoStream()` }],
+          isError: true,
+        };
+      }
+      const timeoutMs = (timeoutSeconds ?? 20) * 1000;
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timed out after ${timeoutMs}ms waiting for clip`)), timeoutMs),
+      );
+      try {
+        const buffer = await Promise.race([
+          (async () => {
+            const mediaObject = await (device as any).getVideoStream();
+            return client.mediaManager.convertMediaObjectToBuffer(mediaObject, "video/mp4");
+          })(),
+          timeout,
+        ]);
+        return {
+          content: [
+            {
+              type: "resource",
+              resource: { uri: `clip:${idOrName}:${Date.now()}`, mimeType: "video/mp4", blob: (buffer as Buffer).toString("base64") },
+            },
+          ],
+        };
+      } catch (err: any) {
+        return { content: [{ type: "text", text: `Failed to capture clip: ${err?.message ?? err}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
     "set_onoff",
     "Turn an OnOff-capable device (switch, plug, light) on or off.",
     {
