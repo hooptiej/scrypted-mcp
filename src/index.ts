@@ -4,8 +4,43 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import express from "express";
 import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { z } from "zod";
 import { getScryptedClient } from "./scryptedClient.js";
+
+interface FFmpegInputDescriptor {
+  url?: string;
+  urls?: string[];
+  inputArguments?: string[];
+}
+
+async function captureClip(
+  ffmpegInput: FFmpegInputDescriptor,
+  durationSeconds: number,
+  timeoutMs: number,
+): Promise<Buffer> {
+  const dir = await mkdtemp(join(tmpdir(), "scrypted-clip-"));
+  const outPath = join(dir, "clip.mp4");
+  try {
+    const inputArgs = ffmpegInput.inputArguments?.length
+      ? ffmpegInput.inputArguments
+      : ["-i", ffmpegInput.url ?? ffmpegInput.urls?.[0] ?? ""];
+    const args = [...inputArgs, "-t", String(durationSeconds), "-c", "copy", "-y", outPath];
+    await new Promise<void>((resolve, reject) => {
+      const proc = execFile("ffmpeg", args, { timeout: timeoutMs }, (err, _stdout, stderr) => {
+        if (err) reject(new Error(`ffmpeg failed: ${err.message}\n${stderr?.slice(-2000)}`));
+        else resolve();
+      });
+      proc.on("error", reject);
+    });
+    return await readFile(outPath);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
 
 function createServer(): McpServer {
   const server = new McpServer({
@@ -76,13 +111,13 @@ function createServer(): McpServer {
   server.tool(
     "record_clip",
     "Capture a short live video clip from a camera right now and return it as video/mp4. This pulls " +
-      "directly from the camera's live stream, not from NVR-stored recordings, so it works even when " +
-      "NVR recording is disabled/unlicensed.",
+      "directly from the camera's live stream via ffmpeg, not from NVR-stored recordings, so it works " +
+      "even when NVR recording is disabled/unlicensed.",
     {
       idOrName: z.string().describe("Camera device id or exact device name"),
-      timeoutSeconds: z.number().optional().describe("How long to wait for the clip before giving up (default 20)"),
+      durationSeconds: z.number().optional().describe("Clip length in seconds (default 10)"),
     },
-    async ({ idOrName, timeoutSeconds }) => {
+    async ({ idOrName, durationSeconds }) => {
       const client = await getScryptedClient();
       const device =
         client.systemManager.getDeviceById(idOrName) ??
@@ -96,23 +131,20 @@ function createServer(): McpServer {
           isError: true,
         };
       }
-      const timeoutMs = (timeoutSeconds ?? 20) * 1000;
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`Timed out after ${timeoutMs}ms waiting for clip`)), timeoutMs),
-      );
+      const duration = durationSeconds ?? 10;
       try {
-        const buffer = await Promise.race([
-          (async () => {
-            const mediaObject = await (device as any).getVideoStream();
-            return client.mediaManager.convertMediaObjectToBuffer(mediaObject, "video/mp4");
-          })(),
-          timeout,
-        ]);
+        const mediaObject = await (device as any).getVideoStream();
+        const descriptorBuffer: Buffer = await client.mediaManager.convertMediaObjectToBuffer(
+          mediaObject,
+          "x-scrypted/x-ffmpeg-input",
+        );
+        const ffmpegInput: FFmpegInputDescriptor = JSON.parse(descriptorBuffer.toString());
+        const buffer = await captureClip(ffmpegInput, duration, (duration + 20) * 1000);
         return {
           content: [
             {
               type: "resource",
-              resource: { uri: `clip:${idOrName}:${Date.now()}`, mimeType: "video/mp4", blob: (buffer as Buffer).toString("base64") },
+              resource: { uri: `clip:${idOrName}:${Date.now()}`, mimeType: "video/mp4", blob: buffer.toString("base64") },
             },
           ],
         };

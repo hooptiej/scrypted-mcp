@@ -13,6 +13,7 @@ server — cloud or self-hosted — not just a Docker deployment.
 | `list_devices` | List all devices with id, name, type, and supported interfaces |
 | `get_device_state` | Full current state of one device by id or name |
 | `camera_snapshot` | Take a still snapshot from a camera |
+| `record_clip` | Capture a short live video clip from a camera via ffmpeg, independent of NVR recordings |
 | `set_onoff` | Turn a switch/plug/light on or off |
 | `set_lock` | Lock or unlock a device |
 | `get_recording_active` | Check whether a camera is actively recording to the NVR |
