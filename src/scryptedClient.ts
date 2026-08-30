@@ -29,6 +29,14 @@ export async function getScryptedClient(): Promise<ScryptedClientStatic> {
       // is a built-in plugin that's always installed, so it's a safe default.
       pluginId: "@scrypted/core",
       local: true,
+    }).then((client) => {
+      // The Scrypted server can restart out from under us (e.g. a container
+      // restart). Without this, every subsequent call would keep resolving
+      // to the same dead RPC peer and fail with "RpcPeer has been killed".
+      client.onClose = () => {
+        clientPromise = undefined;
+      };
+      return client;
     }).catch((err) => {
       // Reset so the next call retries the connection instead of caching a rejected promise.
       clientPromise = undefined;
