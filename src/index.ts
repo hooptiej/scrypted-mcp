@@ -182,16 +182,18 @@ function createServer(): McpServer {
       }
       const auth = username ? `${encodeURIComponent(username)}:${encodeURIComponent(password ?? "")}@` : "";
       const url = `rtsp://${auth}${ip}:554/11`;
+      const vlcUrl = `vlc://${url}`;
       return {
         content: [
           {
             type: "text",
             text:
-              `${url}\n\n` +
-              "This is a raw RTSP stream, not a web link — it will not open or play in a normal " +
-              "browser tab. Open it in VLC (File > Open Network Stream) or another RTSP-capable " +
-              "media player. Port 554 and path /11 are this camera family's convention; if a camera " +
-              "doesn't respond on this URL, its real stream path may differ.",
+              `[Open in VLC](${vlcUrl})\n\n` +
+              `Raw RTSP URL (paste into VLC > File > Open Network Stream if the link above doesn't launch VLC directly): ${url}\n\n` +
+              "Neither link opens in a normal browser tab — the vlc:// link only works where VLC is " +
+              "installed and registered as its handler, and clicking it may prompt to confirm opening " +
+              "VLC. Port 554 and path /11 are this camera family's convention; if a camera doesn't " +
+              "respond on this URL, its real stream path may differ.",
           },
         ],
       };
