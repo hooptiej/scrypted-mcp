@@ -133,7 +133,7 @@ function createServer(): McpServer {
       }
       const duration = durationSeconds ?? 10;
       try {
-        const mediaObject = await (device as any).getVideoStream();
+        const mediaObject = await (device as any).getVideoStream({ route: "external" });
         const descriptorBuffer: Buffer = await client.mediaManager.convertMediaObjectToBuffer(
           mediaObject,
           "x-scrypted/x-ffmpeg-input",
