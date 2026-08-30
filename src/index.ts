@@ -156,10 +156,11 @@ function createServer(): McpServer {
 
   server.tool(
     "get_live_stream_url",
-    "Get a direct rtsp:// URL for a camera's live stream, openable in VLC or any RTSP-capable player. " +
-      "Uses route:'direct' to bypass Scrypted's NVR/rebroadcast layer entirely and get the stream " +
-      "straight from the camera, so it works regardless of NVR licensing or Scrypted-side stream health. " +
-      "The URL includes the camera's credentials embedded (rtsp://user:pass@host/...).",
+    "Get a direct rtsp:// URL for an ONVIF camera's live stream, openable in VLC or any RTSP-capable " +
+      "player. Built from the camera's own ip/username/password (as configured in the ONVIF plugin) " +
+      "plus the standard RTSP port/path this camera family uses, bypassing Scrypted entirely - so it " +
+      "works regardless of NVR licensing or Scrypted-side stream health. Not a web link; won't play in " +
+      "a browser tab. The URL includes the camera's credentials embedded (rtsp://user:pass@host/...).",
     { idOrName: z.string().describe("Camera device id or exact device name") },
     async ({ idOrName }) => {
       const client = await getScryptedClient();
@@ -169,38 +170,31 @@ function createServer(): McpServer {
       if (!device) {
         return { content: [{ type: "text", text: `No device found for "${idOrName}"` }], isError: true };
       }
-      if (typeof (device as any).getVideoStream !== "function") {
-        return {
-          content: [{ type: "text", text: `Device "${idOrName}" does not support VideoCamera.getVideoStream()` }],
-          isError: true,
-        };
+      if (typeof (device as any).getSettings !== "function") {
+        return { content: [{ type: "text", text: `Device "${idOrName}" has no readable ONVIF settings` }], isError: true };
       }
-      try {
-        const mediaObject = await (device as any).getVideoStream({ route: "direct" });
-        const descriptorBuffer: Buffer = await client.mediaManager.convertMediaObjectToBuffer(
-          mediaObject,
-          "x-scrypted/x-ffmpeg-input",
-        );
-        const ffmpegInput: FFmpegInputDescriptor = JSON.parse(descriptorBuffer.toString());
-        const url = ffmpegInput.url ?? ffmpegInput.urls?.[0];
-        if (!url) {
-          return { content: [{ type: "text", text: `No direct stream URL available for "${idOrName}"` }], isError: true };
-        }
-        return {
-          content: [
-            {
-              type: "text",
-              text:
-                `${url}\n\n` +
-                "This is a raw RTSP stream, not a web link — it will not open or play in a normal " +
-                "browser tab. Open it in VLC (File > Open Network Stream) or another RTSP-capable " +
-                "media player.",
-            },
-          ],
-        };
-      } catch (err: any) {
-        return { content: [{ type: "text", text: `Failed to get stream URL: ${err?.message ?? err}` }], isError: true };
+      const settings = await (device as any).getSettings();
+      const ip = settings.find((s: any) => s.key === "ip")?.value;
+      const username = settings.find((s: any) => s.key === "username")?.value;
+      const password = settings.find((s: any) => s.key === "password")?.value;
+      if (!ip) {
+        return { content: [{ type: "text", text: `Device "${idOrName}" has no ONVIF "ip" setting - not an ONVIF camera?` }], isError: true };
       }
+      const auth = username ? `${encodeURIComponent(username)}:${encodeURIComponent(password ?? "")}@` : "";
+      const url = `rtsp://${auth}${ip}:554/11`;
+      return {
+        content: [
+          {
+            type: "text",
+            text:
+              `${url}\n\n` +
+              "This is a raw RTSP stream, not a web link — it will not open or play in a normal " +
+              "browser tab. Open it in VLC (File > Open Network Stream) or another RTSP-capable " +
+              "media player. Port 554 and path /11 are this camera family's convention; if a camera " +
+              "doesn't respond on this URL, its real stream path may differ.",
+          },
+        ],
+      };
     },
   );
 
