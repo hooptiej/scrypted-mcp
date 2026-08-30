@@ -3,7 +3,11 @@ services:
     build: .
     container_name: scrypted-mcp
     restart: unless-stopped
-    ports:
-      - "3300:3000"
+    # Host networking is required so record_clip's ffmpeg process can reach
+    # Scrypted's internal loopback stream proxy (127.0.0.1:<random port>),
+    # which is only reachable from within the host's own network namespace.
+    # PORT in .env must match the port you want this reachable on, since
+    # host mode has no port remapping.
+    network_mode: host
     env_file:
       - .env

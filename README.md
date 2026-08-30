@@ -38,7 +38,9 @@ Copy `.env.example` to `.env` and fill in:
 - `SCRYPTED_BASE_URL` — your Scrypted server's URL
 - `SCRYPTED_USERNAME` / `SCRYPTED_PASSWORD` — credentials for an account on that server
 - `SCRYPTED_INSECURE=1` — only if your server uses a self-signed cert you trust
-- `PORT` — HTTP port to listen on (default `3000`)
+- `PORT` — HTTP port to listen on (default `3000`). With Docker Compose's `network_mode: host`
+  (required for `record_clip` to reach Scrypted's internal stream proxy — see below), there's no
+  port remapping, so set this to whatever port you actually want to expose.
 
 ## Running locally
 
@@ -49,10 +51,17 @@ npm run dev
 
 ## Running with Docker
 
+`docker-compose.yml` uses `network_mode: host` — required for `record_clip`, which spawns
+ffmpeg against Scrypted's internal loopback stream proxy (`127.0.0.1:<random port>`, only
+reachable from within the host's own network namespace, not a bridged container network).
+Set `PORT` in `.env` to whatever port you want exposed, since host mode has no remapping.
+
 ```bash
-docker build -t scrypted-mcp .
-docker run -p 3000:3000 --env-file .env scrypted-mcp
+docker compose up -d --build
 ```
+
+Without host networking (e.g. running standalone via `docker run -p`), every other tool still
+works fine — only `record_clip` needs it.
 
 ## Connecting a client
 
