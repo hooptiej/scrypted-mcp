@@ -191,6 +191,51 @@ function createServer(): McpServer {
   );
 
   server.tool(
+    "get_device_mixins",
+    "List the mixin provider ids currently applied to a device (e.g. HomeKit, Rebroadcast/prebuffer, motion detection).",
+    { idOrName: z.string().describe("Device id or exact device name") },
+    async ({ idOrName }) => {
+      const client = await getScryptedClient();
+      const device =
+        client.systemManager.getDeviceById(idOrName) ??
+        client.systemManager.getDeviceByName(idOrName);
+      if (!device) {
+        return { content: [{ type: "text", text: `No device found for "${idOrName}"` }], isError: true };
+      }
+      const mixins = await (device as any).mixins;
+      return { content: [{ type: "text", text: JSON.stringify(mixins ?? [], null, 2) }] };
+    },
+  );
+
+  server.tool(
+    "add_device_mixin",
+    "Apply a mixin provider to a device without disturbing its other existing mixins. Reads the " +
+      "device's current mixin list, appends the given mixin id if not already present, and calls " +
+      "setMixins() with the combined list.",
+    {
+      idOrName: z.string().describe("Device id or exact device name"),
+      mixinId: z.string().describe("Device id of the mixin provider to add (e.g. the id of a MixinProvider device from list_devices)"),
+    },
+    async ({ idOrName, mixinId }) => {
+      const client = await getScryptedClient();
+      const device =
+        client.systemManager.getDeviceById(idOrName) ??
+        client.systemManager.getDeviceByName(idOrName);
+      if (!device) {
+        return { content: [{ type: "text", text: `No device found for "${idOrName}"` }], isError: true };
+      }
+      const current: string[] = (await (device as any).mixins) ?? [];
+      if (current.includes(mixinId)) {
+        return { content: [{ type: "text", text: JSON.stringify({ idOrName, mixinId, alreadyApplied: true, mixins: current }, null, 2) }] };
+      }
+      const updated = [...current, mixinId];
+      await (device as any).setMixins(updated);
+      const confirmed = await (device as any).mixins;
+      return { content: [{ type: "text", text: JSON.stringify({ idOrName, mixinId, mixins: confirmed }, null, 2) }] };
+    },
+  );
+
+  server.tool(
     "invoke_device_method",
     "Escape hatch: call an arbitrary method on a device by name, with JSON-encoded arguments. " +
       "Use this for plugin-specific capabilities not covered by a dedicated tool (e.g. NVR recording " +

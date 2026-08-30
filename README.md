@@ -17,6 +17,8 @@ server — cloud or self-hosted — not just a Docker deployment.
 | `set_lock` | Lock or unlock a device |
 | `get_recording_active` | Check whether a camera is actively recording to the NVR |
 | `set_recording_active` | Turn NVR recording on/off for a camera |
+| `get_device_mixins` | List the mixin provider ids currently applied to a device |
+| `add_device_mixin` | Apply a mixin provider to a device without disturbing its other mixins |
 | `invoke_device_method` | Escape hatch to call any method on any device |
 
 `get_recording_active`/`set_recording_active` wrap the documented `VideoRecorderManagement`
