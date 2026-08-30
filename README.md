@@ -14,6 +14,7 @@ server — cloud or self-hosted — not just a Docker deployment.
 | `get_device_state` | Full current state of one device by id or name |
 | `camera_snapshot` | Take a still snapshot from a camera |
 | `record_clip` | Capture a short live video clip from a camera via ffmpeg, independent of NVR recordings |
+| `get_live_stream_url` | Get a direct rtsp:// URL for a camera's live stream (open in VLC, not a browser) |
 | `set_onoff` | Turn a switch/plug/light on or off |
 | `set_lock` | Lock or unlock a device |
 | `get_recording_active` | Check whether a camera is actively recording to the NVR |
